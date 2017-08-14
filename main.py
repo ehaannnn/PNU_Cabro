@@ -42,7 +42,6 @@ def save_data():
 #save_data()
 
 def load_data(name):
-	os.chdir(os.getcwd()+"\data")
 	for sr in glob.glob(name+"*.json"):
 		f = open(sr,"r")
 		data = json.loads(f.read())
@@ -108,7 +107,7 @@ def count_most_common_word():
 					f.write(word+" : "+str(count) + "\n")
 				f.close()
 
-
+'''				
 import spiral
 x,y = spiral.get_spiral_pointer()
 #import sys
@@ -124,7 +123,61 @@ for it,item in enumerate(data['data']['children']):
 f = open("news0_test.json","w")
 json.dump(data,f)
 f.close()
+'''
 
+def integrate_subreddit():
+	os.chdir(os.getcwd()+"\data")
+	all_data = json.loads('{"root":"root", "children":[]}')
+	for kind in subreddit:
+		for data,sr in load_data(kind):
+			#print sr
+			for item in data['data']['children']:
+				all_data["children"].append({"downs":item['data']['downs']
+				,"ups":item['data']['ups']
+				,"title":item['data']['title']
+				,"created":item['data']['created']
+				,"subreddit":item['data']['subreddit']
+				,"url":item['data']['url']
+				,"num_comment":item['data']['num_comments']})
+	f = open("all_data.json","w")
+	json.dump(all_data,f)
+	f.close()
+
+def correlation_title_ups():
+	f=open("all_data.json","r")
+	data = json.loads(f.read())
+	f.close()
+
+	items = sorted(data['children'], key=lambda x:x['ups'])
+
+	words = []
+	for it,item in enumerate(items):
+		if it==100:
+			break
+		words += tokenizer(item['title'])
+	
+	f = open("correlation_title_ups.txt","w")
+	common_word = Counter(words).most_common(len(Counter(words)))
+	for word, count in common_word:
+		f.write(word + " : " + str(count) + "\n")
+	f.close()
+
+
+def top_20(comments, score):
+	f=open("all_data.json","r")
+	data = json.loads(f.read())
+	f.close()
+
+	data['children'] = sorted(data['children'], key=lambda x:x['ups']*score+x['num_comment']*comments)
+	f = open("top_20.json","w")
+	json.dump(data,f)
+	f.close()
+
+if len(sys.argv)!=1:
+	top_20(str(sys.argv[1]),str(sys.argv[2]))
+
+
+#correlation_title_ups()
 #count_most_common_word()
 
 
