@@ -49,26 +49,32 @@ def load_data(name):
 		yield data,name
 
 def show_correlation_num_comments_and_socre():
-	for data,sr in load_data():
-		x = []
-		y = []
-		for item in data['data']['children']:
-			x.append(item['data']['num_comments'])
-			y.append(item['data']['score'])
+	f = open(os.getcwd()+"\\data\\all_data.json","r")
+	data = json.loads(f.read())
+	f.close()
+	#for data,sr in data:
+	x = []
+	y = []
+	for item in data['children']:
+		x.append(item['num_comment'])
+		y.append(item['ups']-item['downs'])
+	slope, intercept, r, p, std = stats.linregress(x,y)
+	ry = polyval([slope, intercept], x)
 
-		slope, intercept, r, p, std = stats.linregress(x,y)
-		ry = polyval([slope, intercept], x)
+	print stats.pearsonr(x,y)
 
-		#print(slope, intercept, r, p, std)
+	print(slope, intercept, r, p, std)
 		#print(ry)
-		plot(x,y, 'k.')
-		plot(x,ry, 'r.-')
-		title(sr)
-		pylab.xlabel('num_comments')
-		pylab.ylabel('score')
-		#legend(['original', 'regression'])
+	plot(x,y, 'k.')
+	plot(x,ry, 'r.-')
+	title("all data")
+	pylab.xlabel('num_comments')
+	pylab.ylabel('score')
+	#legend(['original', 'regression'])
 
-		show()
+	show()
+#show_correlation_num_comments_and_socre()
+
 
 from collections import defaultdict,Counter
 import operator
@@ -92,20 +98,36 @@ def most_popular_subreddit():
 import re
 def tokenizer(message):
 	message = message.lower()
-	all_words = re.findall("[0-9a-z']+", message)
+	all_words = re.findall("[0-9a-z]+", message)
 	return all_words
 
 def count_most_common_word():
-	for data,sr in load_data("politics"):
-		for item in data['data']['children']:
-			if item['data']['selftext'] != None:
-				all_words = tokenizer(item['data']['selftext'])
-				f = open(sr+"_most_common_words.txt","a")
-				f.write(item['data']['title'] + " , ups : " + str(item['data']['ups']) + " , downs : "+\
-					str(item['data']['downs']) + " : , score : "+ str(item['data']['score']) + "\n")
-				for word, count in Counter(all_words).most_common(10):
-					f.write(word+" : "+str(count) + "\n")
-				f.close()
+	trivial_words = ['a','the','is','are','in','to','for','and','of','with','i','on','your','from','this','it','that',\
+						'what\'s','my','you','at','up','about','he','she','why','don\'t','years','take','can','but',\
+						'me','as','s','was','by','be','when','never','had','have','too','his','him','her','get','now',\
+						'us','says','make','were','always','am','well','being','will','do','did','all','how','if','after','before',\
+						'what','new','an','not','has','made','i\'m','want','til','really','u','two','one','doesn\'t','since']
+	f = open(os.getcwd()+"\\data\\all_data.json","r")
+	data = json.loads(f.read())
+	f.close()
+
+	words = []
+	for item in data['children']:
+		words += tokenizer(item['title'])
+
+	from collections import Counter
+	f = open("word_cloud.csv","w")
+	for word,count in Counter(words).items():
+		#print word, count
+		if count<=10:
+			continue
+		if word in trivial_words:
+			continue
+		f.write(word+","+str(count)+"\n")
+	f.close()
+
+#count_most_common_word()
+
 
 '''				
 import spiral
@@ -127,7 +149,7 @@ f.close()
 
 def integrate_subreddit():
 	os.chdir(os.getcwd()+"\data")
-	all_data = json.loads('{"root":"root", "children":[]}')
+	all_data = json.loads('{"root":"all", "children":[]}')
 	for kind in subreddit:
 		for data,sr in load_data(kind):
 			#print sr
@@ -142,6 +164,8 @@ def integrate_subreddit():
 	f = open("all_data.json","w")
 	json.dump(all_data,f)
 	f.close()
+
+#integrate_subreddit()
 
 def correlation_title_ups():
 	f=open("all_data.json","r")
@@ -163,6 +187,8 @@ def correlation_title_ups():
 	f.close()
 
 
+
+
 def top_20(comments, score):
 	f=open("all_data.json","r")
 	data = json.loads(f.read())
@@ -175,6 +201,8 @@ def top_20(comments, score):
 
 if len(sys.argv)!=1:
 	top_20(str(sys.argv[1]),str(sys.argv[2]))
+
+
 
 
 #correlation_title_ups()
@@ -234,3 +262,62 @@ print "average num_comments popular : ", popc/pop
 print "average num_comments politics : ", polc/pol
 print "average num_comments total: ", totalc/size
 '''
+
+
+
+def sort_word_cloud():
+	import csv
+	f = open("word_cloud.csv","r")
+	reader = csv.reader(f, delimiter=",")
+
+	sortedlist = sorted(reader,key=lambda row: int(row[1]), reverse=True)
+	f.close()
+
+	return sortedlist
+
+def anova_test():
+	sensitive_words = ['trump','sex','scaramucci','russia','arpaio',\
+				'donald','obamacare','president','north','korea','russian','china',\
+				'transgender','crisis','criminal','dunkirk','killed','killing','maduro','sheriff',\
+				'duterte','shooting','drugs','drug','dead','fuck','f**k','pussy','death','fucking','f***ing',\
+				'mccain','gay','tillerson','slayer','motherfucker','trumpgret','suck']
+
+	f = open(os.getcwd()+"\\data\\all_data.json","r")
+	data = json.loads(f.read())
+	f.close()
+
+	x_ups = []	#collect sensitive_words score
+	x_downs = []
+	x_score = []
+
+	y_ups = []	#collect non_sensitive_words score
+	y_downs = []
+	y_score = []
+	#f=open("test.txt","w")
+	for item in data['children']:
+		words = tokenizer(item['title'])
+		check = False
+		for word in words:
+			if word in sensitive_words:	
+				check = True
+				break
+		if check == False:
+			y_ups.append(item['ups'])
+			y_downs.append(item['downs'])
+			y_score.append(item['ups']-item['downs'])
+			#if item['ups'] > 5000:
+			#	print str(item['title'])
+		else:
+			x_ups.append(item['ups'])
+			x_downs.append(item['downs'])
+			x_score.append(item['ups']-item['downs'])
+			#f.write(item['title']+"\n")
+	
+	print len(x_ups), len(y_ups)
+	print np.mean(x_ups), np.mean(y_ups)
+
+	print stats.ttest_ind(x_ups,y_ups)
+	#print stats.ttest_ind(x_downs,y_downs)
+	#print stats.ttest_ind(x_score,y_score)
+	#f.close()
+#anova_test()
